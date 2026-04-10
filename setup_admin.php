@@ -1,8 +1,8 @@
 <?php
 include 'config.php';
 
-$user = 'admin';
-$pass = 'sbvictoria'; // This will be your real password
+$user = $_ENV['ADMIN_USER'] ?? 'admin';
+$pass = $_ENV['ADMIN_PASS'] ?? 'sbvictoria'; 
 
 // Clean the table and insert the fresh user
 $conn->query("TRUNCATE TABLE users");
