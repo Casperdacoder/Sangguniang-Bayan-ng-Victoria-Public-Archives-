@@ -127,9 +127,9 @@ $result = $stmt->get_result();
                 <thead>
                     <tr>
                         <th>Document Details</th>
-                        <th>Type</th>
-                        <th>Enacted Date</th>
-                        <th>File</th>
+                        <th style="text-align:center;">Type</th>
+                        <th style="text-align:center;">Enacted Date</th>
+                        <th style="text-align:center;">File</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -140,13 +140,13 @@ $result = $stmt->get_result();
                                     <div style="font-weight: 700; font-size: 1rem; color: #0f172a;"><?php echo $row['title']; ?></div>
                                     <div style="color: #64748b; font-size: 0.8rem; margin-top: 3px;"><?php echo $row['doc_number']; ?></div>
                                 </td>
-                                <td>
+                                <td style="text-align:center;">
                                     <span class="badge badge-<?php echo $row['category']; ?>">
                                         <?php echo $row['category']; ?>
                                     </span>
                                 </td>
-                                <td style="font-weight: 500; font-size: 0.9rem;"><?php echo date("M d, Y", strtotime($row['date_enacted'])); ?></td>
-                                <td>
+                                <td style="text-align:center; font-weight: 500; font-size: 0.9rem;"><?php echo date("M d, Y", strtotime($row['date_enacted'])); ?></td>
+                                <td style="text-align:center;">
                                     <a href="view_file.php?id=<?php echo $row['id']; ?>" class="view-link" target="_blank">
                                         VIEW PDF
                                     </a>

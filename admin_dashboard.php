@@ -22,37 +22,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
     $action = $_POST['action'];
 
-    if ($id > 0) {
-        if ($current_role == 'admin') {
-            if ($action == 'approve') {
-                $stmt = $conn->prepare("UPDATE documents SET status = 'public' WHERE id = ?");
-                $stmt->bind_param("i", $id); $stmt->execute();
-                log_activity($conn, "Approve", "Approved Document ID: $id");
-            } elseif ($action == 'reject') {
-                $stmt = $conn->prepare("UPDATE documents SET status = 'rejected' WHERE id = ?");
-                $stmt->bind_param("i", $id); $stmt->execute();
-                log_activity($conn, "Reject", "Rejected Document ID: $id");
-            } elseif ($action == 'toggle_private') {
-                $stmt = $conn->prepare("UPDATE documents SET status = 'private' WHERE id = ?");
-                $stmt->bind_param("i", $id); $stmt->execute();
-                log_activity($conn, "Hide", "Set Document ID: $id to Private");
-            } elseif ($action == 'toggle_public') {
-                $stmt = $conn->prepare("UPDATE documents SET status = 'public' WHERE id = ?");
-                $stmt->bind_param("i", $id); $stmt->execute();
-                log_activity($conn, "Publish", "Set Document ID: $id to Public");
-            } elseif ($action == 'restore') {
-                $stmt = $conn->prepare("UPDATE documents SET is_deleted = 0 WHERE id = ?");
-                $stmt->bind_param("i", $id); $stmt->execute();
-                log_activity($conn, "Restore", "Restored Document ID: $id from Bin");
-            } elseif ($action == 'perm_delete') {
-                $del_stmt = $conn->prepare("DELETE FROM documents WHERE id = ?");
-                $del_stmt->bind_param("i", $id);
-                $del_stmt->execute();
-                log_activity($conn, "Delete", "Permanently Deleted Document ID: $id");
-            }
+    if ($id > 0 && $current_role == 'admin') {
+        $sql = "";
+        switch($action) {
+            case 'approve': $sql = "UPDATE documents SET status = 'public' WHERE id = ?"; break;
+            case 'reject': $sql = "UPDATE documents SET status = 'rejected' WHERE id = ?"; break;
+            case 'toggle_private': $sql = "UPDATE documents SET status = 'private' WHERE id = ?"; break;
+            case 'toggle_public': $sql = "UPDATE documents SET status = 'public' WHERE id = ?"; break;
+            case 'restore': $sql = "UPDATE documents SET is_deleted = 0 WHERE id = ?"; break;
+            case 'perm_delete': $sql = "DELETE FROM documents WHERE id = ?"; break;
         }
 
-        if ($action == 'soft_delete') {
+        if ($sql) {
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $id);
+            if ($stmt->execute()) {
+                log_activity($conn, ucfirst(str_replace('toggle_', '', $action)), "Action $action on ID: $id");
+            }
+        }
+    }
+
+    // Shared Soft Delete Logic
+    if ($id > 0 && $action == 'soft_delete') {
+        if ($current_role == 'admin' || $action == 'soft_delete') {
             if ($current_role == 'admin') {
                 $stmt = $conn->prepare("UPDATE documents SET is_deleted = 1 WHERE id = ?");
                 $stmt->bind_param("i", $id);
@@ -297,18 +289,15 @@ elseif ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['action'])) { // E
         $status = ($current_role == 'admin') ? 'public' : 'hidden'; 
 
         if (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] == 0) {
-            $fileTmpName = $_FILES['pdf_file']['tmp_name'];
+            $fileData = file_get_contents($_FILES['pdf_file']['tmp_name']);
             $fileType = $_FILES['pdf_file']['type'];
-            
-            // Read file content into binary
-            $fileData = file_get_contents($fileTmpName);
 
             $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, category, date_enacted, file_data, file_type, status, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             
-            $null = NULL; // Placeholder for blob
+            $null = NULL;
             $stmt->bind_param("ssssbsss", $title, $doc_num, $category, $date, $null, $fileType, $status, $username);
-            $stmt->send_long_data(4, $fileData); // Send binary data to the 5th parameter (index 4)
-
+            $stmt->send_long_data(4, $fileData);
+            
             if ($stmt->execute()) {
             log_activity($conn, "Upload", "Uploaded new document: $title");
             header("Location: admin_dashboard.php?upload=success");
@@ -828,15 +817,15 @@ $offset = ($page - 1) * $limit;
             <table>
                 <thead>
                     <tr>
-                        <th style="width:1%;"><input type="checkbox" id="select-all"></th>
+                        <th style="width:1%; text-align:center;"><input type="checkbox" id="select-all"></th>
                         <th>Document Details</th>
-                        <th>By</th>
-                        <th>Category</th>
+                        <th style="text-align:center;">By</th>
+                        <th style="text-align:center;">Category</th>
                         <th style="text-align:center;">Status</th>
                         <?php if($current_role == 'admin' && $view != 'pending'): ?>
                             <th style="text-align:center;">Public</th>
                         <?php endif; ?>
-                        <th>Actions</th>
+                        <th style="text-align:center;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -862,13 +851,13 @@ $offset = ($page - 1) * $limit;
                         $st = $row['status'];
                     ?>
                     <tr>
-                        <td><input type="checkbox" name="doc_ids[]" value="<?= $row['id'] ?>" class="doc-checkbox"></td>
+                        <td style="text-align:center;"><input type="checkbox" name="doc_ids[]" value="<?= $row['id'] ?>" class="doc-checkbox"></td>
                         <td>
                             <div style="font-weight: 700; color: #1e293b;"><?= htmlspecialchars($row['title']) ?></div>
                             <div style="font-size: 0.8rem; color: #64748b;"><?= htmlspecialchars($row['doc_number']) ?></div>
                         </td>
-                        <td><?= htmlspecialchars($row['uploaded_by']) ?></td>
-                        <td>
+                        <td style="text-align:center;"><?= htmlspecialchars($row['uploaded_by']) ?></td>
+                        <td style="text-align:center;">
                             <span class="badge badge-<?= htmlspecialchars($row['category']) ?>">
                                 <?= htmlspecialchars($row['category']) ?>
                             </span>
@@ -885,21 +874,21 @@ $offset = ($page - 1) * $limit;
                         
                         <?php if($current_role == 'admin' && $view != 'pending'): ?>
                         <td style="text-align:center;">
-                            <?php if($view == 'active'): ?>
-                            <label class="switch">
-                                <input type="checkbox" <?= ($st == 'public') ? 'checked' : '' ?> <?= ($st == 'rejected') ? 'disabled' : '' ?> onchange="this.form.submit()">
-                                <span class="slider"></span>
-                            </label>
-                            <form method="POST" style="display:none;">
+                            <?php if($view == 'active' && $st != 'rejected'): ?>
+                            <form method="POST" style="display:inline;">
                                 <input type="hidden" name="id" value="<?= $row['id'] ?>">
                                 <input type="hidden" name="action" value="<?= ($st == 'public') ? 'toggle_private' : 'toggle_public' ?>">
+                                <label class="switch">
+                                    <input type="checkbox" <?= ($st == 'public') ? 'checked' : '' ?> onchange="this.form.submit()">
+                                    <span class="slider"></span>
+                                </label>
                             </form>
                             <?php endif; ?>
                         </td>
                         <?php endif; ?>
 
-                        <td>
-                            <div style="display:flex; gap:5px; align-items:center;">
+                        <td style="text-align:center;">
+                            <div style="display:flex; gap:5px; align-items:center; justify-content:center;">
                                 <a href="view_file.php?id=<?= $row['id'] ?>" target="_blank" class="btn-sm btn-review">Review</a>
                                 <a href="admin_dashboard.php?view=edit&id=<?= $row['id'] ?>" class="btn-sm btn-review" style="background:#3b82f6;">Edit</a>
                                 
@@ -914,9 +903,9 @@ $offset = ($page - 1) * $limit;
                                 <?php endif; ?>
 
                                 <?php if($view != 'bin'): ?>
-                                    <form method="POST" style="display:inline; margin-left:auto;" onsubmit="return confirm('Move this item to the Recycle Bin?');">
+                                    <form method="POST" style="display:inline;" onsubmit="return confirm('Move this item to the Recycle Bin?');">
                                         <input type="hidden" name="id" value="<?= $row['id'] ?>">
-                                        <button type="submit" name="action" value="soft_delete" style="background:none; border:none; cursor:pointer; padding:0; font-size:1.2rem;" title="Move to Recycle Bin">
+                                        <button type="submit" name="action" value="soft_delete" style="background:none; border:none; cursor:pointer; padding:0; font-size:1.2rem; display: flex; align-items: center;" title="Move to Recycle Bin">
                                             🗑️
                                         </button>
                                     </form>

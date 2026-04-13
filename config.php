@@ -22,24 +22,25 @@ if (file_exists(__DIR__ . '/.env')) {
  */
 
 // Parse the DATABASE_URL environment variable
-$db_url = $_ENV['DATABASE_URL'] ?? "mysql://root:@127.0.0.1:3306/sb_victoria";
+$db_url = isset($_ENV['DATABASE_URL']) ? $_ENV['DATABASE_URL'] : "mysql://root:@127.0.0.1:3306/sb_victoria";
 $db_parts = parse_url($db_url);
 
-$db_host = $db_parts['host'] . (isset($db_parts['port']) ? ':' . $db_parts['port'] : '');
-$db_user = $db_parts['user'] ?? 'root';
-$db_pass = $db_parts['pass'] ?? '';
-$db_name = ltrim($db_parts['path'] ?? '', '/');
+$db_host = isset($db_parts['host']) ? $db_parts['host'] : '127.0.0.1';
+if (isset($db_parts['port'])) $db_host .= ':' . $db_parts['port'];
+$db_user = isset($db_parts['user']) ? $db_parts['user'] : 'root';
+$db_pass = isset($db_parts['pass']) ? $db_parts['pass'] : '';
+$db_name = isset($db_parts['path']) ? ltrim($db_parts['path'], '/') : 'sb_victoria';
 
 // Create Connection
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+$conn->set_charset("utf8mb4");
 
 // Check Connection
-if ($conn->connect_error) {
-    echo "<div style='color:red; font-family:sans-serif; padding:20px; border:1px solid red;'>";
-    echo "<strong>Database Connection Failed!</strong><br>";
-    echo "Error: " . $conn->connect_error . "<br><br>";
-    echo "<em>Note: Ensure MySQL is started in XAMPP and running on port 3307.</em>";
-    echo "</div>";
+if ($conn->connect_errno) {
+    die(sprintf("<div style='color:red;font-family:sans-serif;padding:20px;'>
+        <strong>Connection Error (%d):</strong> %s<br>
+        <em>Verify XAMPP MySQL is running.</em>
+    </div>", $conn->connect_errno, $conn->connect_error));
     exit();
 }
 

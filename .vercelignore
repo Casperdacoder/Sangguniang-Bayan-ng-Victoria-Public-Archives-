@@ -1,0 +1,8 @@
+# Prevent large assets and local environments from being uploaded
+docs/
+sample_data/
+uploads/
+venv/
+.venv/
+*.pdf
+*.zip

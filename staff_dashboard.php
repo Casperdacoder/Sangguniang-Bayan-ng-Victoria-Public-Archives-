@@ -16,15 +16,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['pdf_file'])) {
     $date = $_POST['date_enacted'];
     
     if (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] == 0) {
-        $fileTmpName = $_FILES['pdf_file']['tmp_name'];
-        $fileType = $_FILES['pdf_file']['type'];
-        $fileData = file_get_contents($fileTmpName);
+        $target_dir = "uploads/";
+        if (!is_dir($target_dir)) { mkdir($target_dir, 0777, true); }
 
-        $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, category, date_enacted, file_data, file_type, status, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, 'hidden', ?)");
+        $filename = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", basename($_FILES['pdf_file']['name']));
+        move_uploaded_file($_FILES['pdf_file']['tmp_name'], $target_dir . $filename);
+
+        $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, category, date_enacted, pdf_path, status, uploaded_by) VALUES (?, ?, ?, ?, ?, 'hidden', ?)");
         
-        $null = NULL;
-        $stmt->bind_param("ssssbss", $title, $doc_num, $category, $date, $null, $fileType, $username);
-        $stmt->send_long_data(4, $fileData);
+        $stmt->bind_param("sssssss", $title, $doc_num, $category, $date, $filename, $username);
 
         if ($stmt->execute()) {
             log_activity($conn, "Upload", "Staff uploaded: $title");
@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                     <tr>
                         <th>My Documents</th>
                         <th style="text-align:center;">Review Status</th>
-                        <th>Actions</th>
+                        <th style="text-align:center;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                                 <?= strtoupper($st == 'hidden' ? 'PENDING REVIEW' : $st) ?>
                             </span>
                         </td>
-                        <td>
+                        <td style="text-align:center;">
                             <a href="view_file.php?id=<?= $row['id'] ?>" target="_blank" class="btn-sm btn-review">View PDF</a>
                             <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this submission?');">
                                 <input type="hidden" name="id" value="<?= $row['id'] ?>">

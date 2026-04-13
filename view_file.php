@@ -5,11 +5,11 @@ if (isset($_GET['id'])) {
     $id = (int)$_GET['id'];
 
     // Fetch binary data, type, and status
-    $stmt = $conn->prepare("SELECT title, file_type, file_data, status FROM documents WHERE id = ?");
+    $stmt = $conn->prepare("SELECT title, file_data, file_type, status FROM documents WHERE id = ?");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $stmt->store_result();
-    $stmt->bind_result($title, $file_type, $file_data, $status);
+    $stmt->bind_result($title, $file_data, $file_type, $status);
 
     if ($stmt->fetch()) {
         // Security Check: If not public, ensure user is logged in
@@ -18,18 +18,12 @@ if (isset($_GET['id'])) {
         }
 
         if (!empty($file_data)) {
-            // Clean output buffer to prevent file corruption
-            if (ob_get_length()) ob_clean();
-
-            // Set headers to display PDF
-            header("Content-Type: " . $file_type);
-            header("Content-Disposition: inline; filename=\"" . preg_replace('/[^a-zA-Z0-9_-]/', '_', $title) . ".pdf\"");
-            header("Content-Length: " . strlen($file_data));
-
+            header("Content-type: " . $file_type);
+            header("Content-Disposition: inline; filename=\"" . basename($title) . ".pdf\"");
             echo $file_data;
             exit();
         } else {
-            echo "Error: File data is empty.";
+            echo "Error: Document data is missing in the database.";
         }
     } else {
         echo "Document not found.";

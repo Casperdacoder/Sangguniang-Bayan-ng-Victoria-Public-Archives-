@@ -350,7 +350,9 @@ body.admin-body {
 
 /* 9. Utility */
 .container {
-    max-width: 1200px !important;
+    max-width: 1600px !important;
+    width: 95% !important;
+    margin: 0 auto !important;
 }
 
 footer {
