@@ -129,7 +129,7 @@ $result = $stmt->get_result();
             <table>
                 <thead>
                     <tr>
-                        <th>Document Details</th>
+                        <th style="text-align:center;">Document Details</th>
                         <th style="text-align:center;">Type</th>
                         <th style="text-align:center;">Enacted Date</th>
                         <th style="text-align:center;">File</th>
@@ -139,9 +139,11 @@ $result = $stmt->get_result();
                     <?php if ($result->num_rows > 0): ?>
                         <?php while($row = $result->fetch_assoc()): ?>
                             <tr>
-                                <td>
-                                    <div style="font-weight: 700; font-size: 1rem; color: #0f172a;"><?php echo $row['title']; ?></div>
-                                    <div style="color: #64748b; font-size: 0.8rem; margin-top: 3px;"><?php echo $row['doc_number']; ?></div>
+                                <td style="text-align:center;">
+                                    <span style="font-weight: 700; font-size: 1rem; color: #0f172a;"><?php echo $row['title']; ?></span>
+                                    <?php if(!empty($row['doc_number'])): ?>
+                                        <span style="color: #64748b; font-size: 0.8rem; margin-left: 5px;"><?php echo $row['doc_number']; ?></span>
+                                    <?php endif; ?>
                                 </td>
                                 <td style="text-align:center;">
                                     <span class="badge badge-<?php echo $row['category']; ?>">

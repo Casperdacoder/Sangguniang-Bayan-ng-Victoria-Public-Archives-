@@ -917,8 +917,10 @@ $offset = ($page - 1) * $limit;
                     <tr>
                         <td style="text-align:center;"><input type="checkbox" name="doc_ids[]" value="<?= $row['id'] ?>" class="doc-checkbox"></td>
                         <td>
-                            <div style="font-weight: 700; color: #1e293b;"><?= htmlspecialchars($row['title']) ?></div>
-                            <div style="font-size: 0.8rem; color: #64748b;"><?= htmlspecialchars($row['doc_number']) ?></div>
+                            <span style="font-weight: 700; color: #1e293b;"><?= htmlspecialchars($row['title']) ?></span>
+                            <?php if(!empty($row['doc_number'])): ?>
+                                <span style="font-size: 0.8rem; color: #64748b; margin-left: 5px;"><?= htmlspecialchars($row['doc_number']) ?></span>
+                            <?php endif; ?>
                         </td>
                         <td style="text-align:center;"><?= htmlspecialchars($row['uploaded_by']) ?></td>
                         <td style="text-align:center;">

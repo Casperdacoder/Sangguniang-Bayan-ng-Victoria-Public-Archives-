@@ -142,8 +142,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                     ?>
                     <tr>
                         <td>
-                            <div style="font-weight: 700; color: #1e293b;"><?= htmlspecialchars($row['title']) ?></div>
-                            <div style="font-size: 0.8rem; color: #64748b;"><?= htmlspecialchars($row['doc_number']) ?></div>
+                            <span style="font-weight: 700; color: #1e293b;"><?= htmlspecialchars($row['title']) ?></span>
+                            <?php if(!empty($row['doc_number'])): ?>
+                                <span style="font-size: 0.8rem; color: #64748b; margin-left: 5px;"><?= htmlspecialchars($row['doc_number']) ?></span>
+                            <?php endif; ?>
                         </td>
                         <td style="text-align:center;">
                             <span class="badge" style="background:<?= ($st=='hidden'?'#fef3c7':($st=='rejected'?'#fee2e2':'#dcfce7')) ?>; color:<?= ($st=='hidden'?'#92400e':($st=='rejected'?'#ef4444':'#166534')) ?>;">
