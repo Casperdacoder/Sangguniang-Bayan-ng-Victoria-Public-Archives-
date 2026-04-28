@@ -7,29 +7,56 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') {
 }
 
 $username = $_SESSION['username'];
+$message = "";
+
+if (isset($_GET['upload']) && $_GET['upload'] == 'success') {
+    $message = "<div style='color:green; margin-bottom:15px; font-weight:bold;'>✅ Document submitted successfully for review!</div>";
+}
 
 // UPLOAD LOGIC
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['pdf_file'])) {
     $title = trim($_POST['title']);
-    $doc_num = trim($_POST['doc_number']);
-    $category = $_POST['category'];
-    $date = $_POST['date_enacted'];
-    
+    $doc_num = trim($_POST['doc_number']); // Changed to $doc_num for consistency with admin_dashboard
+    $year = trim($_POST['year']);
+    $category = $_POST['category']; // Order of Business, Journal, etc.
+    $date_enacted = $_POST['date_enacted'];
+    $uploaded_by = $_SESSION['username'];
+    $status = 'hidden'; // Staff uploads are 'hidden' for approval
+
     if (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] == 0) {
+        // 2. Move File First (Avoids MySQL "Gone Away" during transfer)
+        // File Upload Handling
         $target_dir = "uploads/";
         if (!is_dir($target_dir)) { mkdir($target_dir, 0777, true); }
 
-        $filename = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", basename($_FILES['pdf_file']['name']));
-        move_uploaded_file($_FILES['pdf_file']['tmp_name'], $target_dir . $filename);
+        $file_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", basename($_FILES['pdf_file']['name'])); // Sanitize filename
+        $target_file = $target_dir . $file_name;
 
-        $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, category, date_enacted, pdf_path, status, uploaded_by) VALUES (?, ?, ?, ?, ?, 'hidden', ?)");
-        
-        $stmt->bind_param("sssssss", $title, $doc_num, $category, $date, $filename, $username);
+        if (move_uploaded_file($_FILES["pdf_file"]["tmp_name"], $target_file)) {
+            // 3. FRESH CONNECTION (Ensures server is 'awake' for the INSERT)
+            global $db_host, $db_user, $db_pass, $db_name; // Ensure globals are accessible
+            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+            $conn->set_charset("utf8mb4");
+            
+            if ($conn->connect_error) {
+                die("Connection failed: " . $conn->connect_error);
+            }
 
-        if ($stmt->execute()) {
-            log_activity($conn, "Upload", "Staff uploaded: $title");
-            header("Location: staff_dashboard.php?success=1");
-            exit();
+            // PREPARE: 7 placeholders for 7 columns
+            $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, year, category, date_enacted, pdf_path, status, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            
+            // BIND: 7 variables matching 'sssssss'
+            $stmt->bind_param("ssssssss", $title, $doc_num, $year, $category, $date_enacted, $file_name, $status, $uploaded_by);
+
+            if ($stmt->execute()) {
+                log_activity($conn, "Upload", "Staff uploaded: $title");
+                header("Location: staff_dashboard.php?upload=success");
+                exit();
+            } else {
+                echo "Database Error: " . $stmt->error;
+            }
+        } else {
+            echo "Error: Check folder permissions for 'uploads/'.";
         }
     }
 }
@@ -71,13 +98,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
 </div>
 <div class="main">
     <h1>Staff Submission Portal</h1>
+    <?php echo $message; ?>
     
     <div class="card">
         <h3 style="margin-top:0;">Upload New Document</h3>
         <form method="POST" enctype="multipart/form-data" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: flex-end;">
             <input type="text" name="title" placeholder="Document Title" required>
             <input type="text" name="doc_number" placeholder="Res/Ord No.">
-            <select name="category"><option>Ordinance</option><option>Resolution</option></select>
+            <input type="text" name="year" placeholder="Year (YYYY)" pattern="\d{4}" maxlength="4" required title="Please enter a 4-digit year">
+            <select name="category" class="input-field" required>
+                <option value="">-- Select Category --</option>
+                <option value="Order of Business">Order of Business</option>
+                <option value="Journal">Journal</option>
+                <option value="Appropriation Ordinance">Appropriation Ordinance</option>
+                <option value="General Ordinance">General Ordinance</option>
+                <option value="Resolution">Resolution</option>
+                <option value="Minutes of Meeting">Minutes of Meeting</option>
+            </select>
             <input type="date" name="date_enacted" required>
             <input type="file" name="pdf_file" accept=".pdf" required>
             <button type="submit" style="background:#1e293b; color:white; border:none; padding:10px; border-radius:4px; cursor:pointer; font-weight:bold;">Upload to Admin</button>

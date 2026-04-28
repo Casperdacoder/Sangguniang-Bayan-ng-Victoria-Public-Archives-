@@ -270,52 +270,105 @@ elseif ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['action'])) { // E
         $id = (int)$_POST['update_id'];
         $title = trim($_POST['title']);
         $doc_num = trim($_POST['doc_number']);
+        $year = trim($_POST['year']);
         $category = $_POST['category'];
         $date = $_POST['date_enacted'];
         
-        $stmt = $conn->prepare("UPDATE documents SET title=?, doc_number=?, category=?, date_enacted=? WHERE id=?");
-        $stmt->bind_param("ssssi", $title, $doc_num, $category, $date, $id);
+        $stmt = $conn->prepare("UPDATE documents SET title=?, doc_number=?, year=?, category=?, date_enacted=? WHERE id=?");
+        $stmt->bind_param("sssssi", $title, $doc_num, $year, $category, $date, $id);
         $stmt->execute();
         log_activity($conn, "Edit", "Updated details for: $title");
-        header("Location: admin_dashboard.php?msg=updated");
+        header("Location: admin_dashboard.php?view=active&msg=updated");
         exit();
     } elseif (isset($_FILES['pdf_file'])) {
         $title = trim($_POST['title']);
         $doc_num = trim($_POST['doc_number']);
         $category = $_POST['category'];
         $date = $_POST['date_enacted'];
+        $status = 'public'; 
 
-        // Admin uploads are public; Staff uploads are hidden
-        $status = ($current_role == 'admin') ? 'public' : 'hidden'; 
+        if (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] == 0) { // Ensure file was uploaded without error
+            // 1. Collect Data (Removed mysqli_real_escape_string as bind_param handles escaping)
+            $title = trim($_POST['title']);
+            $doc_num = trim($_POST['doc_number']);
+        $year = trim($_POST['year']);
+            $category = $_POST['category'];
+            $date_enacted = $_POST['date_enacted'];
+            $uploaded_by = $_SESSION['username'];
+            $status = 'public'; // Admin uploads are public by default
 
-        if (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] == 0) {
-            $fileData = file_get_contents($_FILES['pdf_file']['tmp_name']);
-            $fileType = $_FILES['pdf_file']['type'];
+            // 2. Move File First (Avoids MySQL "Gone Away" during transfer)
+            $target_dir = "uploads/";
+            if (!is_dir($target_dir)) { mkdir($target_dir, 0777, true); }
+            $file_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", basename($_FILES['pdf_file']['name'])); // Sanitize filename
+            $target_file = $target_dir . $file_name;
 
-            $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, category, date_enacted, file_data, file_type, status, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            
-            $null = NULL;
-            $stmt->bind_param("ssssbsss", $title, $doc_num, $category, $date, $null, $fileType, $status, $username);
-            $stmt->send_long_data(4, $fileData);
-            
-            if ($stmt->execute()) {
-            log_activity($conn, "Upload", "Uploaded new document: $title");
-            header("Location: admin_dashboard.php?upload=success");
-            exit();
+            if (move_uploaded_file($_FILES["pdf_file"]["tmp_name"], $target_file)) {
+                // 3. FRESH CONNECTION (Ensures server is 'awake' for the INSERT)
+                global $db_host, $db_user, $db_pass, $db_name; // Ensure globals are accessible
+                $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+                $conn->set_charset("utf8mb4");
+
+                if ($conn->connect_error) {
+                    die("Connection failed: " . $conn->connect_error);
+                }
+
+                // 4. INSERT DATA
+                $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, year, category, date_enacted, pdf_path, status, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("ssssssss", $title, $doc_num, $year, $category, $date_enacted, $file_name, $status, $uploaded_by);
+                
+                if ($stmt->execute()) {
+                    log_activity($conn, "Upload", "Uploaded new document: $title");
+                    header("Location: admin_dashboard.php?view=active&upload=success");
+                    exit();
+                }
+            } else {
+                echo "Error: Check folder permissions for 'uploads/'.";
             }
         }
     }
 }
 
 // 6. DATA FETCHING & COUNTERS
+// Safe check: if connection is lost, just reconnect
+if (!isset($conn) || @!$conn->ping()) {
+    global $db_host, $db_user, $db_pass, $db_name;
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    // Ensure charset is set for the new connection
+    if (!$conn->connect_error) {
+        $conn->set_charset("utf8mb4");
+    }
+}
+
+// Handle Success Messages from Redirects
+if (isset($_GET['upload']) && $_GET['upload'] == 'success') {
+    $message = "<div style='color:green; margin-bottom:15px; font-weight:bold;'>✅ Document uploaded successfully to the archive!</div>";
+} elseif (isset($_GET['msg']) && $_GET['msg'] == 'updated') {
+    $message = "<div style='color:green; margin-bottom:15px; font-weight:bold;'>✅ Document details updated successfully!</div>";
+}
+
 $view = isset($_GET['view']) ? $_GET['view'] : 'dashboard';
 $search_q = isset($_GET['search']) ? trim($_GET['search']) : '';
 $is_dashboard_search = ($view == 'dashboard' && !empty($search_q));
 
-$pending_count = $conn->query("SELECT COUNT(*) as total FROM documents WHERE status = 'hidden' AND is_deleted = 0")->fetch_assoc()['total'];
-$bin_count = $conn->query("SELECT COUNT(*) as total FROM documents WHERE is_deleted = 1")->fetch_assoc()['total'];
-$total_docs_count = $conn->query("SELECT COUNT(*) as total FROM documents WHERE is_deleted = 0")->fetch_assoc()['total'];
-$total_users_count = $conn->query("SELECT COUNT(*) as total FROM users")->fetch_assoc()['total'];
+$res_p = $conn->query("SELECT COUNT(*) as total FROM documents WHERE status = 'hidden' AND is_deleted = 0");
+$pending_count = ($res_p) ? $res_p->fetch_assoc()['total'] : 0;
+
+$res_b = $conn->query("SELECT COUNT(*) as total FROM documents WHERE is_deleted = 1");
+$bin_count = ($res_b) ? $res_b->fetch_assoc()['total'] : 0;
+
+// Get Total Documents Count
+$sql_total = "SELECT COUNT(*) as total FROM documents WHERE is_deleted = 0";
+$result_total = $conn->query($sql_total);
+if ($result_total) {
+    $row_total = $result_total->fetch_assoc();
+    $total_docs_count = $row_total['total'];
+} else {
+    $total_docs_count = 0; 
+}
+
+$res_u = $conn->query("SELECT COUNT(*) as total FROM users");
+$total_users_count = ($res_u) ? $res_u->fetch_assoc()['total'] : 0;
 
 // Fetch event for editing if needed
 $edit_event = null;
@@ -419,9 +472,11 @@ $offset = ($page - 1) * $limit;
             <input type="hidden" name="update_id" value="<?= $row['id'] ?>">
             <input type="text" name="title" value="<?= htmlspecialchars($row['title']) ?>" required placeholder="Document Title">
             <input type="text" name="doc_number" value="<?= htmlspecialchars($row['doc_number']) ?>" placeholder="Document No.">
+            <input type="text" name="year" value="<?= htmlspecialchars($row['year'] ?? '') ?>" placeholder="Year (YYYY)" pattern="\d{4}" maxlength="4" required title="Please enter a 4-digit year">
             <select name="category">
                 <option <?= $row['category'] == 'Ordinance' ? 'selected' : '' ?>>Ordinance</option>
                 <option <?= $row['category'] == 'Resolution' ? 'selected' : '' ?>>Resolution</option>
+                <option <?= $row['category'] == 'Minutes of Meeting' ? 'selected' : '' ?>>Minutes of Meeting</option>
             </select>
             <input type="date" name="date_enacted" value="<?= $row['date_enacted'] ?>" required>
             <button type="submit" class="btn">Save Changes</button>
@@ -736,7 +791,16 @@ $offset = ($page - 1) * $limit;
         <form method="POST" enctype="multipart/form-data" class="form-grid">
             <input type="text" name="title" placeholder="Document Title" required>
             <input type="text" name="doc_number" placeholder="Doc No.">
-            <select name="category"><option>Ordinance</option><option>Resolution</option></select>
+            <input type="text" name="year" placeholder="Year (YYYY)" pattern="\d{4}" maxlength="4" required title="Please enter a 4-digit year">
+            <select name="category" class="input-field" required>
+                <option value="">-- Select Category --</option>
+                <option value="Order of Business">Order of Business</option>
+                <option value="Journal">Journal</option>
+                <option value="Appropriation Ordinance">Appropriation Ordinance</option>
+                <option value="General Ordinance">General Ordinance</option>
+                <option value="Resolution">Resolution</option>
+                <option value="Minutes of Meeting">Minutes of Meeting</option>
+            </select>
             <input type="date" name="date_enacted" required>
             <input type="file" name="pdf_file" accept=".pdf" required style="padding: 10px; background: white;">
             <button type="submit" class="btn" style="background: var(--primary-dark) !important;">Upload Document</button>

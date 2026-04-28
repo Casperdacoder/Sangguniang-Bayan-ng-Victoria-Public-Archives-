@@ -31,17 +31,22 @@ $db_user = isset($db_parts['user']) ? $db_parts['user'] : 'root';
 $db_pass = isset($db_parts['pass']) ? $db_parts['pass'] : '';
 $db_name = isset($db_parts['path']) ? ltrim($db_parts['path'], '/') : 'sb_victoria';
 
-// Create Connection
+// Initial Connection
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+
+// Robust connection check using try-catch to prevent Fatal Exceptions
+try {
+    if ($conn->connect_error || !$conn->ping()) {
+        $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    }
+} catch (Throwable $e) {
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+}
+
 $conn->set_charset("utf8mb4");
 
-// Check Connection
-if ($conn->connect_errno) {
-    die(sprintf("<div style='color:red;font-family:sans-serif;padding:20px;'>
-        <strong>Connection Error (%d):</strong> %s<br>
-        <em>Verify XAMPP MySQL is running.</em>
-    </div>", $conn->connect_errno, $conn->connect_error));
-    exit();
+if ($conn->connect_error) {
+    die("Database Connection Failed: " . $conn->connect_error);
 }
 
 // 5. Global Security Gatekeeper
@@ -61,7 +66,12 @@ if (!function_exists('protect_page')) {
 // 7. Activity Logging Helper
 if (!function_exists('log_activity')) {
     function log_activity($conn, $action, $details) {
-        $user = isset($_SESSION['username']) ? $_SESSION['username'] : 'System';
+        try {
+            if (!$conn || !$conn->ping()) { return; } 
+        } catch (Throwable $e) {
+            return; // Exit if connection is dead
+        }
+        $user = $_SESSION['username'] ?? 'System';
         $stmt = $conn->prepare("INSERT INTO activity_log (username, action, details) VALUES (?, ?, ?)");
         $stmt->bind_param("sss", $user, $action, $details);
         $stmt->execute();

@@ -99,9 +99,12 @@ $result = $stmt->get_result();
             <label>Category</label>
             <select name="category">
                 <option value="All">All Types</option>
-                <option value="Ordinance" <?php if($category == 'Ordinance') echo 'selected'; ?>>Ordinance</option>
+                <option value="Order of Business" <?php if($category == 'Order of Business') echo 'selected'; ?>>Order of Business</option>
+                <option value="Journal" <?php if($category == 'Journal') echo 'selected'; ?>>Journal</option>
+                <option value="Appropriation Ordinance" <?php if($category == 'Appropriation Ordinance') echo 'selected'; ?>>Appropriation Ordinance</option>
+                <option value="General Ordinance" <?php if($category == 'General Ordinance') echo 'selected'; ?>>General Ordinance</option>
                 <option value="Resolution" <?php if($category == 'Resolution') echo 'selected'; ?>>Resolution</option>
-                <option value="Minutes" <?php if($category == 'Minutes') echo 'selected'; ?>>Minutes</option>
+                <option value="Minutes of Meeting" <?php if($category == 'Minutes of Meeting') echo 'selected'; ?>>Minutes of Meeting</option>
             </select>
         </div>
 

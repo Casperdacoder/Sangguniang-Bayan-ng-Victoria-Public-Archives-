@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome | Municipality of Victoria</title>
-    <link rel="stylesheet" href="style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="style.css?v=<?php echo filemtime('style.css'); ?>">
 </head>
 <body>
 
@@ -45,14 +45,14 @@
 </section>
 
 <section class="leaders-section">
-    <h2 style="font-size: 2.5rem; color: var(--brand);">Municipal Leadership</h2>
+    <h2 style="font-size: 2.5rem; color: var(--primary);">Municipal Leadership</h2>
     <div style="width: 60px; height: 4px; background: var(--gold); margin: 10px auto 20px;"></div>
 
     <div class="top-leader" style="gap: 60px;">
         <div class="leader-card" style="width: 100%; max-width: 300px;">
             <div class="flip-card-inner">
                 <div class="flip-card-front">
-                    <img src="Pics/.jpg" alt="Mayor">
+                    <img src="Pics/Inciong.jpg" alt="Mayor">
                     <h3>Hon. Richard V. Inciong</h3>
                     <p>MUNICIPAL MAYOR</p>
                 </div>
@@ -79,13 +79,13 @@
         </div>
     </div>
 
-    <h3 style="color: var(--brand); margin-top: 30px;">Sangguniang Bayan Members</h3>
+    <h3 style="color: var(--primary); margin-top: 30px;">Sangguniang Bayan Members</h3>
     <div class="leader-grid">
         <div class="leader-card" style="width: 100%; max-width: 250px; margin: 0 auto;">
             <div class="flip-card-inner">
                 <div class="flip-card-front">
                     <img src="Pics/Del Mundo.jpg" alt="Councilor">
-                    <h3>Hon. Maria Fe A.Del Mundo</h3>
+                    <h3>Hon. Maria Fe A. Del Mundo</h3>
                     <p>Municipal Councilor</p>
                 </div>
                 <div class="flip-card-back">
@@ -178,7 +178,7 @@
             <div class="flip-card-inner">
                 <div class="flip-card-front">
                     <img src="Pics/chester.jpg" alt="Councilor">
-                    <h3>Hon.Chester T. Dumas</h3>
+                    <h3>Hon. Chester T. Dumas</h3>
                     <p>Municipal Councilor</p>
                 </div>
                 <div class="flip-card-back">
@@ -189,7 +189,7 @@
         </div>
     </div>
 
-    <h3 style="color: var(--brand); margin-top: 30px;">Ex-Officio Members</h3>
+    <h3 style="color: var(--primary); margin-top: 30px;">Ex-Officio Members</h3>
     <div class="top-leader">
         <div class="leader-card" style="width: 100%; max-width: 250px; margin: 0 auto;">
             <div class="flip-card-inner">
@@ -219,7 +219,7 @@
         </div>
     </div>
 
-    <h3 style="color: var(--brand); margin-top: 30px;">Secretary to the Sangguniang Bayan</h3>
+    <h3 style="color: var(--primary); margin-top: 30px;">Secretary to the Sangguniang Bayan</h3>
     <div class="top-leader">
         <div class="leader-card" style="width: 100%; max-width: 250px; margin: 0 auto;">
             <div class="flip-card-inner">

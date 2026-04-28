@@ -209,7 +209,11 @@ input:focus, select:focus, textarea:focus {
 }
 
 .badge-Ordinance, .badge-public { background: #dcfce7 !important; color: #166534 !important; }
-.badge-Resolution, .badge-Minutes { background: #dbeafe !important; color: #1e40af !important; }
+.badge-Resolution { background: #dbeafe !important; color: #1e40af !important; }
+.badge-Journal, .badge-Minutes.of.Meeting { background: #d1fae5 !important; color: #065f46 !important; } /* Light Teal */
+.badge-Order.of.Business { background: #e0e7ff !important; color: #4338ca !important; } /* Light Indigo */
+.badge-Appropriation.Ordinance { background: #fef9c3 !important; color: #a16207 !important; } /* Light Yellow */
+.badge-General.Ordinance { background: #f3e8ff !important; color: #7e22ce !important; } /* Light Purple */
 .badge-hidden { background: #fee2e2 !important; color: #991b1b !important; }
 
 /* 8. Admin & Dashboard Layout (Unified) */
