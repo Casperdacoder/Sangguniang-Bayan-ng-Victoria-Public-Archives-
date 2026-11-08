@@ -12,7 +12,7 @@ $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : '';
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : '';
 
 // Build the SQL Query dynamically - CRITICAL: Filter for 'public' status only
-$sql = "SELECT * FROM documents WHERE status = 'public'";
+$sql = "SELECT * FROM documents WHERE status = 'public' AND is_deleted = 0";
 $params = [];
 $types = "";
 
@@ -48,7 +48,7 @@ if (!empty($start_date) && !empty($end_date)) {
     $types .= "s";
 }
 
-$sql .= " ORDER BY date_enacted DESC";
+$sql .= " ORDER BY title ASC";
 
 $stmt = $conn->prepare($sql);
 if (!empty($params)) {

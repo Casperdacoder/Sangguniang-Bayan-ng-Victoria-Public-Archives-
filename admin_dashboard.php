@@ -42,19 +42,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // Shared Soft Delete Logic
+    // Single Item Soft Delete Logic
     if ($id > 0 && $action == 'soft_delete') {
-        if ($current_role == 'admin' || $action == 'soft_delete') {
-            if ($current_role == 'admin') {
-                $stmt = $conn->prepare("UPDATE documents SET is_deleted = 1 WHERE id = ?");
-                $stmt->bind_param("i", $id);
-            } else { // Staff can only delete their own
-                $stmt = $conn->prepare("UPDATE documents SET is_deleted = 1 WHERE id = ? AND uploaded_by = ?");
-                $stmt->bind_param("is", $id, $username);
-            }
-            $stmt->execute();
-            log_activity($conn, "Recycle", "Moved Document ID: $id to Bin");
+        if ($current_role == 'admin') {
+            $stmt = $conn->prepare("UPDATE documents SET is_deleted = 1 WHERE id = ?");
+            $stmt->bind_param("i", $id);
+        } else { // Staff can only delete their own
+            $stmt = $conn->prepare("UPDATE documents SET is_deleted = 1 WHERE id = ? AND uploaded_by = ?");
+            $stmt->bind_param("is", $id, $username);
         }
+        $stmt->execute();
+        log_activity($conn, "Recycle", "Moved Document ID: $id to Bin");
     }
     // Maintain view state after action by preserving GET params
     $redirect_qs = http_build_query(array_intersect_key($_GET, array_flip(['view', 'search', 'page'])));
@@ -64,40 +62,53 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
 
 // HANDLE BULK ACTIONS
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['bulk_action'])) {
-    if ($current_role == 'admin') {
-        $action = $_POST['bulk_action'];
-        $doc_ids = isset($_POST['doc_ids']) ? $_POST['doc_ids'] : [];
+    $action = $_POST['bulk_action'];
+    $doc_ids = isset($_POST['doc_ids']) ? $_POST['doc_ids'] : [];
 
-        if (!empty($action) && !empty($doc_ids) && is_array($doc_ids)) {
-            // Sanitize IDs to prevent SQL injection
-            $sanitized_ids = array_map('intval', $doc_ids);
-            $id_list = implode(',', $sanitized_ids);
+    if (!empty($action) && !empty($doc_ids) && is_array($doc_ids)) {
+        // Sanitize IDs to prevent SQL injection
+        $sanitized_ids = array_map('intval', $doc_ids);
+        $id_list = implode(',', $sanitized_ids);
 
-            if (!empty($id_list)) {
-                $log_action = "Bulk ";
-                $log_details = "Applied to IDs: $id_list";
-                $sql = "";
+        if (!empty($id_list)) {
+            $log_action = "Bulk ";
+            $log_details = "Applied to IDs: $id_list";
+            $sql = "";
 
-                switch ($action) {
-                    case 'approve':
+            switch ($action) {
+                case 'approve':
+                    if ($current_role == 'admin') {
                         $sql = "UPDATE documents SET status = 'public' WHERE id IN ($id_list) AND status = 'hidden'";
                         $log_action .= "Approve";
-                        break;
-                    case 'reject':
+                    }
+                    break;
+                case 'reject':
+                    if ($current_role == 'admin') {
                         $sql = "UPDATE documents SET status = 'rejected' WHERE id IN ($id_list) AND status = 'hidden'";
                         $log_action .= "Reject";
-                        break;
-                    case 'soft_delete':
+                    }
+                    break;
+                case 'soft_delete':
+                    if ($current_role == 'admin') {
                         $sql = "UPDATE documents SET is_deleted = 1 WHERE id IN ($id_list)";
-                        $log_action .= "Recycle";
-                        break;
-                    case 'restore':
+                    } else { // Staff can only delete their own
+                        $sql = "UPDATE documents SET is_deleted = 1 WHERE id IN ($id_list) AND uploaded_by = '" . $conn->real_escape_string($username) . "'";
+                    }
+                    $log_action .= "Recycle";
+                    break;
+                case 'restore':
+                    if ($current_role == 'admin') {
                         $sql = "UPDATE documents SET is_deleted = 0 WHERE id IN ($id_list) AND is_deleted = 1";
                         $log_action .= "Restore";
-                        break;
-                }
+                    } else { // Staff can restore their own
+                        $sql = "UPDATE documents SET is_deleted = 0 WHERE id IN ($id_list) AND uploaded_by = '" . $conn->real_escape_string($username) . "' AND is_deleted = 1";
+                    }
+                    break;
+            }
 
-                if (!empty($sql)) { $conn->query($sql); log_activity($conn, $log_action, $log_details); }
+            if (!empty($sql)) {
+                $conn->query($sql);
+                log_activity($conn, $log_action, $log_details);
             }
         }
     }
@@ -193,14 +204,12 @@ elseif ($_SERVER['REQUEST_METHOD'] == 'POST' && (isset($_POST['save_announcement
         $title = trim($_POST['title']);
         $content = trim($_POST['content']);
 
-        // Fetch existing images if editing to manage the gallery
         $image_list = [];
         if ($id > 0) {
             $existing_ann = $conn->query("SELECT image FROM announcements WHERE id = $id")->fetch_assoc();
-            if ($existing_ann && $existing_ann['image']) {
-                $raw_images = json_decode($existing_ann['image'], true) ?: [$existing_ann['image']];
+            if ($existing_ann && !empty(trim($existing_ann['image']))) {
+                $raw_images = json_decode($existing_ann['image'], true) ?: [['file' => $existing_ann['image'], 'caption' => '']];
                 foreach ($raw_images as $img) {
-                    // Compatibility: Convert old string format to new array format
                     if (is_array($img)) {
                         $image_list[] = $img;
                     } else {
@@ -236,6 +245,8 @@ elseif ($_SERVER['REQUEST_METHOD'] == 'POST' && (isset($_POST['save_announcement
                     if (move_uploaded_file($_FILES['images']['tmp_name'][$k], $target_dir . $new_file)) {
                         $image_list[] = ['file' => $new_file, 'caption' => ''];
                     }
+                } elseif ($_FILES['images']['error'][$k] !== UPLOAD_ERR_NO_FILE) {
+                    $message = "<div class='error-box'>Failed to upload " . htmlspecialchars($_FILES['images']['name'][$k]) . ". Error Code: " . $_FILES['images']['error'][$k] . "</div>";
                 }
             }
         }
@@ -270,12 +281,11 @@ elseif ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['action'])) { // E
         $id = (int)$_POST['update_id'];
         $title = trim($_POST['title']);
         $doc_num = trim($_POST['doc_number']);
-        $year = trim($_POST['year']);
         $category = $_POST['category'];
         $date = $_POST['date_enacted'];
         
-        $stmt = $conn->prepare("UPDATE documents SET title=?, doc_number=?, year=?, category=?, date_enacted=? WHERE id=?");
-        $stmt->bind_param("sssssi", $title, $doc_num, $year, $category, $date, $id);
+        $stmt = $conn->prepare("UPDATE documents SET title=?, doc_number=?, category=?, date_enacted=? WHERE id=?");
+        $stmt->bind_param("ssssi", $title, $doc_num, $category, $date, $id);
         $stmt->execute();
         log_activity($conn, "Edit", "Updated details for: $title");
         header("Location: admin_dashboard.php?view=active&msg=updated");
@@ -291,7 +301,6 @@ elseif ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['action'])) { // E
             // 1. Collect Data (Removed mysqli_real_escape_string as bind_param handles escaping)
             $title = trim($_POST['title']);
             $doc_num = trim($_POST['doc_number']);
-        $year = trim($_POST['year']);
             $category = $_POST['category'];
             $date_enacted = $_POST['date_enacted'];
             $uploaded_by = $_SESSION['username'];
@@ -314,8 +323,8 @@ elseif ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['action'])) { // E
                 }
 
                 // 4. INSERT DATA
-                $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, year, category, date_enacted, pdf_path, status, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("ssssssss", $title, $doc_num, $year, $category, $date_enacted, $file_name, $status, $uploaded_by);
+                $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, category, date_enacted, pdf_path, status, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("sssssss", $title, $doc_num, $category, $date_enacted, $file_name, $status, $uploaded_by);
                 
                 if ($stmt->execute()) {
                     log_activity($conn, "Upload", "Uploaded new document: $title");
@@ -472,13 +481,12 @@ $offset = ($page - 1) * $limit;
             <input type="hidden" name="update_id" value="<?= $row['id'] ?>">
             <input type="text" name="title" value="<?= htmlspecialchars($row['title']) ?>" required placeholder="Document Title">
             <input type="text" name="doc_number" value="<?= htmlspecialchars($row['doc_number']) ?>" placeholder="Document No.">
-            <input type="text" name="year" value="<?= htmlspecialchars($row['year'] ?? '') ?>" placeholder="Year (YYYY)" pattern="\d{4}" maxlength="4" required title="Please enter a 4-digit year">
             <select name="category">
                 <option <?= $row['category'] == 'Ordinance' ? 'selected' : '' ?>>Ordinance</option>
                 <option <?= $row['category'] == 'Resolution' ? 'selected' : '' ?>>Resolution</option>
                 <option <?= $row['category'] == 'Minutes of Meeting' ? 'selected' : '' ?>>Minutes of Meeting</option>
             </select>
-            <input type="date" name="date_enacted" value="<?= $row['date_enacted'] ?>" required>
+            <input type="date" name="date_enacted" value="<?= $row['date_enacted'] ?>" min="1000-01-01" max="2026-12-31" required>
             <button type="submit" class="btn">Save Changes</button>
             <a href="admin_dashboard.php" class="btn" style="background: transparent !important; color: #64748b !important; border: 1px solid #cbd5e1 !important;">Cancel</a>
         </form>
@@ -580,7 +588,7 @@ $offset = ($page - 1) * $limit;
         <form method="POST" class="form-grid" style="grid-template-columns: 1fr;">
             <input type="hidden" name="event_id" value="<?= $edit_event['id'] ?? 0 ?>">
             <input type="text" name="event_title" placeholder="Event Title" value="<?= htmlspecialchars($edit_event['event_title'] ?? '') ?>" required>
-            <input type="date" name="event_date" value="<?= htmlspecialchars($edit_event['event_date'] ?? '') ?>" required>
+            <input type="date" name="event_date" value="<?= htmlspecialchars($edit_event['event_date'] ?? '') ?>" min="1000-01-01" max="2026-12-31" required>
             <input type="text" name="event_location" placeholder="Event Location / Venue" value="<?= htmlspecialchars($edit_event['event_location'] ?? '') ?>">
             <textarea name="event_description" placeholder="Event Description (optional)"><?= htmlspecialchars($edit_event['event_description'] ?? '') ?></textarea>
             <button type="submit" name="save_event" class="btn-add" style="width: auto; justify-self: start;"><?= $edit_event ? 'Update Event' : 'Create Event' ?></button>
@@ -593,7 +601,13 @@ $offset = ($page - 1) * $limit;
         <h3>Existing Events</h3>
         <div class="table-responsive">
             <table>
-                <thead><tr><th>Title</th><th>Date</th><th>Actions</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th style="text-align:center;">Date</th>
+                        <th style="text-align:center;">Actions</th>
+                    </tr>
+                </thead>
                 <tbody>
                     <?php 
                     $total_events = $conn->query("SELECT COUNT(*) as count FROM events")->fetch_assoc()['count'];
@@ -609,8 +623,8 @@ $offset = ($page - 1) * $limit;
                             <?php endif; ?>
                             <br><small style="color:#64748b;"><?= htmlspecialchars($er['event_description']) ?></small>
                         </td>
-                        <td><?= date("M d, Y", strtotime($er['event_date'])) ?></td>
-                        <td>
+                        <td style="text-align:center;"><?= date("M d, Y", strtotime($er['event_date'])) ?></td>
+                        <td style="text-align:center;">
                             <a href="admin_dashboard.php?view=events&edit=<?= $er['id'] ?>" class="btn-edit">Edit</a>
                             <form method="POST" style="display:inline;" onsubmit="return confirm('Delete this event?');"><input type="hidden" name="event_id" value="<?= $er['id'] ?>"><button type="submit" name="delete_event" class="btn-del" style="border:none; background:transparent; cursor:pointer;">Remove</button></form>
                         </td>
@@ -694,12 +708,14 @@ $offset = ($page - 1) * $limit;
             <div class="field-group">
                 <label style="font-size: 0.75rem; color: #64748b; font-weight: 700;">Attach Photos (Optional - Select multiple)</label>
                 <input type="file" name="images[]" accept="image/*" multiple style="padding: 10px; background: white;">
-                <?php if ($edit_ann && $edit_ann['image']): ?>
+                <?php if ($edit_ann && !empty(trim($edit_ann['image']))): ?>
                     <div style="margin-top: 10px; display: flex; gap: 15px; flex-wrap: wrap;">
                         <?php 
-                        $imgs = json_decode($edit_ann['image'], true) ?: [];
+                        $imgs = json_decode($edit_ann['image'], true);
+                        if (!$imgs) $imgs = [['file' => $edit_ann['image'], 'caption' => '']];
                         foreach($imgs as $img): ?>
                             <?php $f = is_array($img) ? $img['file'] : $img; ?>
+                            <?php if(!empty($f)): ?>
                             <div style="width: 150px; background: #f1f5f9; padding: 8px; border-radius: 8px; border: 1px solid #e2e8f0;">
                                 <img src="uploads/<?= htmlspecialchars($f) ?>" style="width: 100%; height: 80px; object-fit: cover; border-radius: 4px; display: block; margin-bottom: 5px;">
                                 <input type="text" name="image_captions[<?= htmlspecialchars($f) ?>]" value="<?= htmlspecialchars($img['caption'] ?? '') ?>" placeholder="Alt text..." style="font-size: 0.7rem; padding: 4px !important; height: auto; margin-bottom: 5px;">
@@ -707,6 +723,7 @@ $offset = ($page - 1) * $limit;
                                     <input type="checkbox" name="remove_images[]" value="<?= htmlspecialchars($f) ?>"> Remove
                                 </label>
                             </div>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
@@ -723,7 +740,11 @@ $offset = ($page - 1) * $limit;
         <div class="table-responsive">
             <table>
                 <thead>
-                    <tr><th>Post Details</th><th>Date</th><th>Action</th></tr>
+                    <tr>
+                        <th>Post Details</th>
+                        <th style="text-align:center;">Date</th>
+                        <th style="text-align:center;">Action</th>
+                    </tr>
                 </thead>
                 <tbody>
                     <?php 
@@ -734,9 +755,20 @@ $offset = ($page - 1) * $limit;
                     while($ar = $ann_res->fetch_assoc()): ?>
                     <tr style="border-bottom: 2px solid #f1f5f9;">
                         <td style="padding: 20px 15px;">
-                            <strong><?= htmlspecialchars($ar['title']) ?></strong>
-                            <?php if($ar['image']): ?> <span class="badge" style="background:#dbeafe; color:#1e40af;">📷 Image</span> <?php endif; ?>
-                            <div class="announcement-body" style="color:#64748b; line-height: 1.4; margin-top: 5px;">
+                            <div style="display:flex; gap:15px; align-items:flex-start;">
+                                <?php if(!empty(trim($ar['image']))): 
+                                    $imgs = json_decode($ar['image'], true);
+                                    if (!$imgs) $imgs = [['file' => $ar['image']]];
+                                    $first_img = is_array($imgs[0]) ? $imgs[0]['file'] : $imgs[0];
+                                ?>
+                                    <?php if(!empty($first_img)): ?>
+                                    <img src="uploads/<?= htmlspecialchars($first_img) ?>" style="width:60px; height:60px; object-fit:cover; border-radius:4px; border:1px solid #e2e8f0;">
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                                <div>
+                                    <strong><?= htmlspecialchars($ar['title']) ?></strong>
+                                    <?php if($ar['image']): ?> <span class="badge" style="background:#dbeafe; color:#1e40af;">📷 Gallery</span> <?php endif; ?>
+                                    <div class="announcement-body" style="color:#64748b; line-height: 1.4; margin-top: 5px;">
                                 <?php 
                                 $full_text = $ar['content'];
                                 $limit = 300; 
@@ -749,10 +781,12 @@ $offset = ($page - 1) * $limit;
                                 <?php else: ?>
                                     <?= nl2br(htmlspecialchars($full_text)) ?>
                                 <?php endif; ?>
+                                    </div>
+                                </div>
                             </div>
                         </td>
-                        <td><?= date('M d, Y', strtotime($ar['created_at'])) ?></td>
-                        <td>
+                        <td style="text-align:center;"><?= date('M d, Y', strtotime($ar['created_at'])) ?></td>
+                        <td style="text-align:center;">
                             <a href="admin_dashboard.php?view=announcements&edit=<?= $ar['id'] ?>" class="btn-edit">Edit</a>
                             <form method="POST" style="display:inline;" onsubmit="return confirm('Remove this post?');">
                                 <input type="hidden" name="ann_id" value="<?= $ar['id'] ?>">
@@ -788,10 +822,9 @@ $offset = ($page - 1) * $limit;
     <?php if($view == 'active'): ?>
     <div class="card">
         <h3>Quick Upload</h3>
-        <form method="POST" enctype="multipart/form-data" class="form-grid">
+        <form id="quick-upload-form" method="POST" enctype="multipart/form-data" class="form-grid">
             <input type="text" name="title" placeholder="Document Title" required>
             <input type="text" name="doc_number" placeholder="Doc No.">
-            <input type="text" name="year" placeholder="Year (YYYY)" pattern="\d{4}" maxlength="4" required title="Please enter a 4-digit year">
             <select name="category" class="input-field" required>
                 <option value="">-- Select Category --</option>
                 <option value="Order of Business">Order of Business</option>
@@ -801,7 +834,7 @@ $offset = ($page - 1) * $limit;
                 <option value="Resolution">Resolution</option>
                 <option value="Minutes of Meeting">Minutes of Meeting</option>
             </select>
-            <input type="date" name="date_enacted" required>
+            <input type="date" name="date_enacted" min="1000-01-01" max="2026-12-31" required>
             <input type="file" name="pdf_file" accept=".pdf" required style="padding: 10px; background: white;">
             <button type="submit" class="btn" style="background: var(--primary-dark) !important;">Upload Document</button>
         </form>
@@ -857,22 +890,24 @@ $offset = ($page - 1) * $limit;
                     $total_docs = $count_stmt->get_result()->fetch_assoc()['total'];
                     $total_pages = ceil($total_docs / $limit);
     ?>
-    <form method="POST" action="admin_dashboard.php?<?= http_build_query($_GET) ?>">
+    <form id="bulk-action-form" method="POST" action="admin_dashboard.php?<?= http_build_query($_GET) ?>">
+    </form>
+
     <?php if($total_docs > 0): ?>
     <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
-        <select name="bulk_action" style="width: auto; margin-bottom: 0; background: white;">
+        <select name="bulk_action" form="bulk-action-form" style="width: auto; margin-bottom: 0; background: white;">
             <option value="">Bulk Actions...</option>
             <?php if($view == 'pending' && $current_role == 'admin'): ?>
                 <option value="approve">Approve Selected</option>
                 <option value="reject">Reject Selected</option>
             <?php endif; ?>
-            <?php if($view == 'bin' && $current_role == 'admin'): ?>
+            <?php if($view == 'bin'): ?>
                 <option value="restore">Restore Selected</option>
             <?php else: ?>
                 <option value="soft_delete">Move to Recycle Bin</option>
             <?php endif; ?>
         </select>
-        <button type="submit" class="btn" style="width: auto; white-space: nowrap;">Apply</button>
+        <button type="submit" form="bulk-action-form" class="btn" style="width: auto; white-space: nowrap;">Apply</button>
     </div>
     <?php endif; ?>
 
@@ -899,7 +934,7 @@ $offset = ($page - 1) * $limit;
                     if($current_role == 'admin' && $view != 'pending') { $num_cols++; } // For the Public toggle
 
                     // Fetch Data with Limit
-                    $sql = "SELECT * FROM documents " . $where_clause . " ORDER BY id DESC LIMIT ?, ?";
+                    $sql = "SELECT * FROM documents " . $where_clause . " ORDER BY title ASC LIMIT ?, ?";
                     $params[] = $offset;
                     $params[] = $limit;
                     $types .= "ii";
@@ -915,7 +950,7 @@ $offset = ($page - 1) * $limit;
                         $st = $row['status'];
                     ?>
                     <tr>
-                        <td style="text-align:center;"><input type="checkbox" name="doc_ids[]" value="<?= $row['id'] ?>" class="doc-checkbox"></td>
+                        <td style="text-align:center;"><input type="checkbox" name="doc_ids[]" value="<?= $row['id'] ?>" form="bulk-action-form" class="doc-checkbox"></td>
                         <td>
                             <span style="font-weight: 700; color: #1e293b;"><?= htmlspecialchars($row['title']) ?></span>
                             <?php if(!empty($row['doc_number'])): ?>
@@ -1004,7 +1039,6 @@ $offset = ($page - 1) * $limit;
         </div>
         <?php endif; ?>
     </div>
-    </form>
     <?php endif; ?>
 </div>
 

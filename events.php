@@ -1,6 +1,6 @@
 <?php
 include 'config.php';
-$events_result = $conn->query("SELECT event_date, event_title, event_location, event_description FROM events ORDER BY event_date ASC");
+$events_result = $conn->query("SELECT event_date, event_title, event_location, event_description FROM events ORDER BY event_title ASC");
 $events_data = [];
 while($row = $events_result->fetch_assoc()) {
     $date = $row['event_date'];
@@ -95,19 +95,38 @@ $ann_res = $conn->query("SELECT * FROM announcements WHERE status = 'public' ORD
         <?php if ($ann_res && $ann_res->num_rows > 0): ?>
             <?php while($row = $ann_res->fetch_assoc()): ?>
                 <div class="post-card">
-                    <?php if($row['image']): ?>
+                    <?php if(!empty(trim($row['image']))): ?>
                         <?php 
-                            $imgs = json_decode($row['image'], true) ?: [['file' => $row['image'], 'caption' => '']];
+                            $imgs = json_decode($row['image'], true);
+                            if (!$imgs) $imgs = [['file' => $row['image'], 'caption' => '']];
                             $total = count($imgs);
-                            $grid_class = ($total > 3) ? 'grid-more' : 'grid-'.$total; 
+                            
+                            $grid_class = '';
+                            $slice_limit = 0;
+                            if ($total == 1) {
+                                $grid_class = 'grid-1';
+                                $slice_limit = 1;
+                            } elseif ($total == 2) {
+                                $grid_class = 'grid-2';
+                                $slice_limit = 2;
+                            } elseif ($total == 3) {
+                                $grid_class = 'grid-3';
+                                $slice_limit = 3;
+                            } elseif ($total == 4) {
+                                $grid_class = 'grid-4';
+                                $slice_limit = 4;
+                            } else { // total >= 5
+                                $grid_class = 'grid-more';
+                                $slice_limit = 4; // Show 4 images, with the last one having the overlay
+                            }
                         ?>
                         <div class="image-grid <?= $grid_class ?>">
-                            <?php foreach(array_slice($imgs, 0, 3) as $index => $img): ?>
+                            <?php foreach(array_slice($imgs, 0, $slice_limit) as $index => $img): ?>
                                 <?php $f = is_array($img) ? $img['file'] : $img; $cap = is_array($img) ? $img['caption'] : ''; ?>
                                 <div class="grid-item">
                                     <img src="uploads/<?= htmlspecialchars($f) ?>" alt="<?= htmlspecialchars($cap) ?>" title="<?= htmlspecialchars($cap) ?>">
-                                    <?php if($index === 2 && $total > 3): ?>
-                                        <div class="more-overlay">+<?= $total - 3 ?></div>
+                                    <?php if($grid_class === 'grid-more' && $index === 3): // Overlay on the 4th image for grid-more ?>
+                                        <div class="more-overlay">+<?= $total - $slice_limit ?></div>
                                     <?php endif; ?>
                                 </div>
                             <?php endforeach; ?>

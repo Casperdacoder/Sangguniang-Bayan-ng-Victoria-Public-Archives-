@@ -21,18 +21,5 @@ if ($check->num_rows == 0) {
     echo "<p style='color:blue;'>ℹ️ Notice: Column 'file_data' already exists. No changes needed.</p>";
 }
 
-// 2. Add year column if it doesn't exist
-$check_year = $conn->query("SHOW COLUMNS FROM documents LIKE 'year'");
-if ($check_year->num_rows == 0) {
-    $sql = "ALTER TABLE documents ADD COLUMN year VARCHAR(4) AFTER doc_number";
-    if ($conn->query($sql) === TRUE) {
-        echo "<p style='color:green;'>✅ Success: Column 'year' has been added to the 'documents' table.</p>";
-    } else {
-        echo "<p style='color:red;'>❌ Error adding column: " . $conn->error . "</p>";
-    }
-} else {
-    echo "<p style='color:blue;'>ℹ️ Notice: Column 'year' already exists. No changes needed.</p>";
-}
-
 echo "<br><a href='admin_dashboard.php'>Return to Dashboard</a>";
 ?>

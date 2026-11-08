@@ -17,7 +17,6 @@ if (isset($_GET['upload']) && $_GET['upload'] == 'success') {
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['pdf_file'])) {
     $title = trim($_POST['title']);
     $doc_num = trim($_POST['doc_number']); // Changed to $doc_num for consistency with admin_dashboard
-    $year = trim($_POST['year']);
     $category = $_POST['category']; // Order of Business, Journal, etc.
     $date_enacted = $_POST['date_enacted'];
     $uploaded_by = $_SESSION['username'];
@@ -43,10 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['pdf_file'])) {
             }
 
             // PREPARE: 7 placeholders for 7 columns
-            $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, year, category, date_enacted, pdf_path, status, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $conn->prepare("INSERT INTO documents (title, doc_number, category, date_enacted, pdf_path, status, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
             
             // BIND: 7 variables matching 'sssssss'
-            $stmt->bind_param("ssssssss", $title, $doc_num, $year, $category, $date_enacted, $file_name, $status, $uploaded_by);
+            $stmt->bind_param("sssssss", $title, $doc_num, $category, $date_enacted, $file_name, $status, $uploaded_by);
 
             if ($stmt->execute()) {
                 log_activity($conn, "Upload", "Staff uploaded: $title");
@@ -102,10 +101,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     
     <div class="card">
         <h3 style="margin-top:0;">Upload New Document</h3>
-        <form method="POST" enctype="multipart/form-data" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: flex-end;">
+        <form id="staff-upload-form" method="POST" enctype="multipart/form-data" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: flex-end;">
             <input type="text" name="title" placeholder="Document Title" required>
             <input type="text" name="doc_number" placeholder="Res/Ord No.">
-            <input type="text" name="year" placeholder="Year (YYYY)" pattern="\d{4}" maxlength="4" required title="Please enter a 4-digit year">
             <select name="category" class="input-field" required>
                 <option value="">-- Select Category --</option>
                 <option value="Order of Business">Order of Business</option>
@@ -115,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                 <option value="Resolution">Resolution</option>
                 <option value="Minutes of Meeting">Minutes of Meeting</option>
             </select>
-            <input type="date" name="date_enacted" required>
+            <input type="date" name="date_enacted" min="1000-01-01" max="2026-12-31" required>
             <input type="file" name="pdf_file" accept=".pdf" required>
             <button type="submit" style="background:#1e293b; color:white; border:none; padding:10px; border-radius:4px; cursor:pointer; font-weight:bold;">Upload to Admin</button>
         </form>
@@ -133,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                 </thead>
                 <tbody>
                     <?php
-                    $stmt = $conn->prepare("SELECT * FROM documents WHERE uploaded_by = ? AND is_deleted = 0 ORDER BY id DESC");
+                    $stmt = $conn->prepare("SELECT * FROM documents WHERE uploaded_by = ? AND is_deleted = 0 ORDER BY title ASC");
                     $stmt->bind_param("s", $username);
                     $stmt->execute();
                     $res = $stmt->get_result();
@@ -167,5 +165,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
         </div>
     </div>
 </div>
+
 </body>
 </html>

@@ -31,16 +31,12 @@ $db_user = isset($db_parts['user']) ? $db_parts['user'] : 'root';
 $db_pass = isset($db_parts['pass']) ? $db_parts['pass'] : '';
 $db_name = isset($db_parts['path']) ? ltrim($db_parts['path'], '/') : 'sb_victoria';
 
-// Initial Connection
-$conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-
-// Robust connection check using try-catch to prevent Fatal Exceptions
+// Initial connection. Keep this inside try/catch because mysqli can throw
+// before connect_error is available when MySQL is stopped or refusing traffic.
 try {
-    if ($conn->connect_error || !$conn->ping()) {
-        $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-    }
-} catch (Throwable $e) {
     $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+} catch (Throwable $e) {
+    die("Database Connection Failed: Please start MySQL in XAMPP and confirm it is running on port 3306.");
 }
 
 $conn->set_charset("utf8mb4");

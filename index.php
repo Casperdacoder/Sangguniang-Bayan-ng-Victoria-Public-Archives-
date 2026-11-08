@@ -32,15 +32,17 @@
 <section class="vm-section">
     <div class="vm-card">
         <h2>Vision</h2>
-        <p>A premier center for sustainable agriculture and eco-tourism in the region, with a God-centered, resilient, and empowered citizenry.</p>
+        <p>A safe and progressive municipality with sustainability - managed natural resources governed by dynamic leaders in partnership with self-reliant communities.</p>
     </div>
     <div class="vm-card">
         <h2>Mission</h2>
-        <p>To provide excellent public service through transparent governance, sustainable development, and inclusive growth for every Victorian.</p>
+        <p>The Municipal Government of Victoria commits to uplift and uphold the socio-economic condition of people through commitment and active involvement in the provision of appropriate, equitable access, efficient and prompt delivery of programs and services. </p>
     </div>
     <div class="vm-card">
-        <h2>Goals</h2>
-        <p>Promote economic stability, ensure environmental protection, and strengthen social services through digital transparency.</p>
+        <h2>Practical Vision</h2>
+        <p>•	Provider of high quality fruits and livestock </p>
+        <p>•	An agro-eco tourism destination  </p>
+        <p>•	Virctoria as an agro-industrial center of Oriental Mindoro </p>
     </div>
 </section>
 
@@ -52,7 +54,7 @@
         <div class="leader-card" style="width: 100%; max-width: 300px;">
             <div class="flip-card-inner">
                 <div class="flip-card-front">
-                    <img src="Pics/Inciong.jpg" alt="Mayor">
+                    <span class="portrait-frame portrait-inciong" role="img" aria-label="Mayor"></span>
                     <h3>Hon. Richard V. Inciong</h3>
                     <p>MUNICIPAL MAYOR</p>
                 </div>
@@ -194,7 +196,7 @@
         <div class="leader-card" style="width: 100%; max-width: 250px; margin: 0 auto;">
             <div class="flip-card-inner">
                 <div class="flip-card-front">
-                    <img src="Pics/ABC President.jpg" alt="ABC President">
+                    <span class="portrait-frame portrait-abc" role="img" aria-label="ABC President"></span>
                     <h3>Hon. ABC President</h3>
                     <p>ABC President</p>
                 </div>
@@ -213,7 +215,7 @@
                 </div>
                 <div class="flip-card-back">
                     <h3>Hon. Josh Pypers A. Macalintal</h3>
-                    <p>Sangguniang Kabataan</p>
+                    <p>Sangguniang Kabataan Federation President</p>
                 </div>
             </div>
         </div>

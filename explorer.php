@@ -10,7 +10,7 @@ protect_page();
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 
 // 2. Build Query for the 'documents' table
-$sql = "SELECT id, title, doc_number, category, date_enacted FROM documents WHERE is_deleted = 0";
+$sql = "SELECT id, title, doc_number, category, date_enacted FROM documents WHERE is_deleted = 0 AND status = 'public'";
 
 $params = [];
 $types = "";
@@ -24,7 +24,7 @@ if (!empty($q)) {
     $types = "sss";
 }
 
-$sql .= " ORDER BY date_enacted DESC";
+$sql .= " ORDER BY title ASC";
 
 $stmt = $conn->prepare($sql);
 if (!empty($params)) {
